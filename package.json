@@ -1,0 +1,22 @@
+{
+  "name": "zzzql",
+  "version": "1.0.3",
+  "description": "easy and typesafe way to write your sql queries",
+  "main": "dist/zzz.js",
+  "types": "types.d.ts",
+  "scripts": {
+    "test": "npx tsc && node --env-file=.env dist/test.js",
+    "build": "npx tsc"
+  },
+  "keywords": [],
+  "author": "me@cadew.dev",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^20.14.11",
+    "mysql2": "^3.10.3",
+    "typescript": "^5.5.3"
+  },
+  "peerDependencies": {
+    "mysql2": "^3.10.3"
+  }
+}
