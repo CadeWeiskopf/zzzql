@@ -1,4 +1,5 @@
 import { QueryResult } from "mysql2";
+import { and, or } from "./zzz";
 
 type TableName = string;
 type FieldName = string;
@@ -149,48 +150,52 @@ export type ZzzQ =
   | ZzzUpdateQ
   | ZzzTransactionQ;
 
-type NestedArray = Array<string | NestedArray>;
-const removeUndefinedStatements = (inputArr: NestedArray) => {
+const removeUndefinedStatements = (arr: unknown[]) => {
   let flag = false;
-  const reverseIterateAndReplace = (arr: NestedArray): NestedArray => {
-    for (let i = arr.length - 1; i >= 0; i--) {
-      if (Array.isArray(arr[i])) {
-        arr[i] = reverseIterateAndReplace(arr[i] as NestedArray);
-        if ((arr[i] as NestedArray).length === 0) {
-          arr[i] = undefined;
-          flag = true;
-          if (i === 0 && arr.length > 1) {
-            arr[1] = undefined;
-          }
-        }
+  let checkCompleteCondition = true;
+  // console.log(arr);
+  arr = arr.filter(
+    (e) => isWhereConnector(e) || (Array.isArray(e) && e.length > 0)
+  );
+  for (let i = 0; i < arr.length; i++) {
+    const arrI = arr[i];
+    flag = flag || Array.isArray(arrI);
+    // console.log(checkCompleteCondition, flag, arrI);
+    if (flag) {
+      if (isWhereConnector(arrI)) {
+        // console.log("..");
+        flag = false;
+        checkCompleteCondition = true;
       } else {
-        if (flag) {
-          arr[i] = undefined;
-          flag = false;
-        } else if (
-          Array.isArray(arr[i]) &&
-          (arr[i] as NestedArray).length === 0
-        ) {
-          arr[i] = undefined;
-          flag = true;
-        }
+        checkCompleteCondition = false;
       }
+    } else if (isWhereConnector(arrI)) {
+      // console.log("set", arr[i]);
+      arr[i] = undefined;
+      flag = false;
+      // completeCondition = true;
     }
-    return arr.filter((item) => item !== undefined);
-  };
-  return reverseIterateAndReplace(inputArr);
+  }
+  arr = arr.filter((e) => !!e);
+  if (checkCompleteCondition) {
+    // console.log("!!! not complete", `"${arr.join(",")}"`);
+    arr.pop();
+    // console.log("-=>", arr);
+  }
+
+  return arr;
 };
 export const formatParentheses = (arr: unknown[]) => {
-  const replacedInput = removeUndefinedStatements(arr as NestedArray);
+  const replacedInput = removeUndefinedStatements(arr);
   return replacedInput
     .map((item) => {
-      console.log("format", item);
+      // console.log("format", item);
       const p = Array.isArray(item) ? `(${joinWithParentheses(item)})` : item;
       return p === "()" || !p ? "" : p;
     })
     .join(" ");
 };
-const joinWithParentheses = (input: NestedArray): string => {
+const joinWithParentheses = (input: unknown[]): string => {
   return input
     .map((item) =>
       Array.isArray(item) ? `(${joinWithParentheses(item)})` : item
@@ -198,7 +203,7 @@ const joinWithParentheses = (input: NestedArray): string => {
     .join(" ");
 };
 
-export type ZzzResponse<T = QueryResult> =
+export type TZzzResponse<T = QueryResult> =
   | T
   | {
       error: object;

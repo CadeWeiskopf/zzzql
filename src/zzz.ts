@@ -1,3 +1,4 @@
+import { ZzzResponse } from "../types";
 import {
   FieldCompareCondition,
   WhereClause,
@@ -10,7 +11,6 @@ import {
   isWhereConnector,
   mapCompareOp,
   ZzzCreateTableQ,
-  ZzzResponse,
   ZzzUpdateQ,
   ZzzTransactionQ,
 } from "./zzz.model";
