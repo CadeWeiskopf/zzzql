@@ -1,5 +1,4 @@
 import { QueryResult } from "mysql2";
-import { and, or } from "./zzz";
 
 type TableName = string;
 type FieldName = string;
@@ -84,12 +83,17 @@ export type WhereClause =
   | Array<WhereComparison | WhereConnector>
   | FieldComparison;
 
+export type LeftJoin = {
+  table: TableName | string;
+  on: WhereClause;
+};
 export type ZzzSelectQ = {
   select: {
     fields?: string | string[];
     table: TableName | string;
     where?: WhereClause;
     forUpdate?: boolean;
+    leftJoin?: LeftJoin;
   };
 };
 

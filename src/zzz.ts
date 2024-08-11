@@ -13,6 +13,7 @@ import {
   ZzzCreateTableQ,
   ZzzUpdateQ,
   ZzzTransactionQ,
+  LeftJoin,
 } from "./zzz.model";
 import mysql, { Pool, PoolOptions, QueryResult } from "mysql2/promise";
 
@@ -76,7 +77,65 @@ const handleWhereClause = (where: WhereClause) => {
 
   const conditionsString = formatParentheses(nestedWhere);
 
-  return { statement: `WHERE ${conditionsString}`, values };
+  const statement = conditionsString.trim()
+    ? `WHERE ${conditionsString}`
+    : undefined;
+
+  return statement ? { statement, values } : undefined;
+};
+
+const handleJoinOnCondition = (
+  selectTable: string,
+  joinTable: string,
+  fieldCondition: FieldCompareCondition
+) => {
+  if (isWhereConnector(fieldCondition)) {
+    return fieldCondition;
+  }
+  if (Array.isArray(fieldCondition)) {
+    return fieldCondition.map((condition: FieldCompareCondition) => {
+      return handleJoinOnCondition(selectTable, joinTable, condition);
+    });
+  }
+  return Object.entries(fieldCondition)
+    .filter(([_fieldName, compareObj]) => {
+      const [compareOp, compareValue] = Object.entries(compareObj)[0];
+      return compareValue !== undefined;
+    })
+    .map(([fieldName, compareObj]) => {
+      const [compareOp, compareValue] = Object.entries(compareObj)[0];
+      return `${selectTable}.${fieldName} ${mapCompareOp(
+        compareOp
+      )} ${joinTable}.${compareValue}`;
+    })
+    .filter((condition) => condition !== undefined);
+};
+
+const handleJoinClause = (selectTable: string, join: LeftJoin) => {
+  const on = join.on;
+  if (!Array.isArray(on)) {
+    throw new Error("Not supported yet. TODO: implement a single on clause");
+  }
+  const values = [];
+  const nestedWhere = on.map((onObj: WhereConnector | WhereComparison) => {
+    if (isWhereConnector(onObj)) {
+      return onObj;
+    }
+    if (!Array.isArray(onObj)) {
+      return handleJoinOnCondition(selectTable, join.table, onObj);
+    }
+    return onObj.map((fieldCondition: FieldCompareCondition) => {
+      return handleJoinOnCondition(selectTable, join.table, fieldCondition);
+    });
+  });
+
+  const conditionsString = formatParentheses(nestedWhere);
+
+  const statement = conditionsString.trim()
+    ? `LEFT JOIN ${join.table} ON ${conditionsString}`
+    : undefined;
+
+  return statement ? { statement, values } : undefined;
 };
 
 const createSelectStatement = (q: ZzzSelectQ) => {
@@ -84,6 +143,11 @@ const createSelectStatement = (q: ZzzSelectQ) => {
 
   const whereClause =
     select.where === undefined ? undefined : handleWhereClause(select.where);
+
+  const joinClause =
+    select.leftJoin === undefined
+      ? undefined
+      : handleJoinClause(select.table, select.leftJoin);
 
   if (!select.fields) {
     select.fields = "*";
@@ -96,6 +160,7 @@ const createSelectStatement = (q: ZzzSelectQ) => {
       : select.fields,
     `FROM`,
     select.table,
+    joinClause?.statement,
     whereClause?.statement,
     select.forUpdate ? "for update" : undefined,
   ];
@@ -154,7 +219,7 @@ const createUpdateStatement = (q: ZzzUpdateQ) => {
   const queryStrings = [
     `update ${q.update.table}`,
     `set ${setClause}`,
-    whereClause.statement,
+    whereClause?.statement,
   ];
   const values = [
     ...Object.values(q.update.set),
@@ -229,6 +294,6 @@ const q = async <T = QueryResult>(
 
 const query = q;
 
-export default { init, q };
+export default { init, q, pool: () => db };
 export const or = "or";
 export const and = "and";
